@@ -19,6 +19,7 @@ public class Invoice {
     }
 
     public double calculateLateFee(LocalDate actualReturnDate, int allowedDays) {
+        this.returnDate = actualReturnDate;
         long daysLate = ChronoUnit.DAYS.between(borrowDate.plusDays(allowedDays), actualReturnDate);
         if (daysLate > 0) {
             lateFee = daysLate * 1.0;
@@ -32,16 +33,19 @@ public class Invoice {
     }
 
     public double calculateTotalCharge(LocalDate actualReturnDate, int allowedDays, int damagedPages) {
+        this.returnDate = actualReturnDate;
         double lateFee = calculateLateFee(actualReturnDate, allowedDays);
         double damageFee = calculateDamageFee(damagedPages);
         return borrowFee + lateFee + damageFee;
     }
 
     public String generateInvoice(LocalDate actualReturnDate, int allowedDays, int damagedPages) {
+        this.returnDate = actualReturnDate;
         double totalCharge = calculateTotalCharge(actualReturnDate, allowedDays, damagedPages);
         return "Borrow Fee: " + borrowFee + " TL\n" +
                 "Late Fee: " + lateFee + " TL\n" +
                 "Damage Fee: " + damageFee + " TL\n" +
+                "Return Date: " + returnDate + "\n" +
                 "Total Charge: " + totalCharge + " TL\n";
     }
 }

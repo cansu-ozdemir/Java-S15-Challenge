@@ -1,11 +1,6 @@
 package com.library.services;
 
-import com.library.models.Book;
-import com.library.models.BookCategory;
-import com.library.models.BorrowRecord;
-import com.library.models.FinePolicy;
-import com.library.models.Notification;
-import com.library.models.Reader;
+import com.library.models.*;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -18,6 +13,7 @@ public class Library {
     private Set<String> bookIds;
     private Map<String, List<BorrowRecord>> borrowRecordMap;
     private Map<String, Book> bookMap;
+    private Librarian librarian;
 
     public Library() {
         this.books = new ArrayList<>();
@@ -27,6 +23,7 @@ public class Library {
         this.bookIds = new HashSet<>();
         this.borrowRecordMap = new HashMap<>();
         this.bookMap = new HashMap<>();
+        this.librarian = new Librarian("Cansu", "1", this);
     }
 
     public void addReader(Reader reader) {
@@ -39,15 +36,16 @@ public class Library {
         }
     }
 
+    public Map<String, Book> getBookMap() {
+        return bookMap;
+    }
+
+    public Set<String> getBookIds() {
+        return bookIds;
+    }
+
     public void addBook(Book book) {
-        if (bookIds.contains(book.getId())) {
-            System.out.println("ID'si " + book.getId() + " olan kitap zaten mevcut.");
-        } else {
-            books.add(book);
-            bookIds.add(book.getId());
-            bookMap.put(book.getId(), book);
-            System.out.println("Kitap başarıyla eklendi.");
-        }
+        librarian.addBook(book);
     }
 
     public Book findBookById(String id) {
@@ -75,27 +73,11 @@ public class Library {
     }
 
     public void updateBookInfo(String bookId, String newTitle, String newAuthor, BookCategory newCategory) {
-        Book book = findBookById(bookId);
-        if (book != null) {
-            book.setTitle(newTitle);
-            book.setAuthor(newAuthor);
-            book.setCategory(newCategory);
-            System.out.println("Kitap bilgileri başarıyla güncellendi.");
-        } else {
-            System.out.println("Kitap bulunamadı.");
-        }
+        librarian.updateBook(bookId, newTitle, newAuthor, newCategory);
     }
 
     public void removeBook(String bookId) {
-        Book book = findBookById(bookId);
-        if (book != null) {
-            books.remove(book);
-            bookIds.remove(bookId);
-            bookMap.remove(bookId);
-            System.out.println("Kitap başarıyla silindi.");
-        } else {
-            System.out.println("Kitap bulunamadı.");
-        }
+        librarian.removeBook(bookId);
     }
 
     public List<Book> listBooksByCategory(BookCategory category) {
@@ -121,16 +103,17 @@ public class Library {
             System.out.println("Bu kitap mevcut değil.");
         }
     }
+
     public void returnBook(Reader reader, Book book, LocalDate returnDate, int damagedPages) {
         if(!reader.getBorrowedBooks().contains(book)) {
-            System.out.println("Kitap bu okuyucu tarafından ödünç alınmadı.");
+            System.out.println(reader.getName() + "adlı okuyucu tarafından bu kitap ödünç alınmadı.");
             return;
         }
         reader.returnBook(book);
 
         List<BorrowRecord> records = borrowRecordMap.get(reader.getId());
         if (records == null) {
-            System.out.println("Kullanıcıya ait ödünç kitap kaydı bulunamadı.");
+            System.out.println(reader.getName() + "adlı kullanıcıya ait ödünç kitap kaydı bulunamadı.");
             return;
         }
 
@@ -141,10 +124,8 @@ public class Library {
         }
 
         int allowedDays = 30;
-        long daysLate = returnDate.toEpochDay() - record.getBorrowDate().plusDays(allowedDays).toEpochDay();
-        double lateFee = FinePolicy.calculateLateFee((int) daysLate);
-        double damageFee = FinePolicy.calculateDamageFee(damagedPages);
-        double totalCharge = 10.0 + lateFee + damageFee;
+        Invoice invoice = new Invoice(10.0, record.getBorrowDate());
+        double totalCharge = invoice.calculateTotalCharge(returnDate, allowedDays, damagedPages);
 
         if (totalCharge > 10) {
             System.out.println("Ek Ödeme Gerekli: " + (totalCharge - 10.0) + " TL");
@@ -152,12 +133,14 @@ public class Library {
             System.out.println("Geri Ödeme Tutarı: " + (10.0 - totalCharge) + " TL");
         }
 
-        Notification notification = new Notification("Kitap İade Edildi: " + book.getTitle() + ", Toplam Ücret: " + totalCharge + " TL", LocalDate.now());
-        System.out.println(notification);
+        System.out.println(invoice.generateInvoice(returnDate, allowedDays, damagedPages));
 
         book.updateStatus("AVAILABLE");
         bookMap.put(book.getId(), book);
-
         System.out.println("Kitap İade Süreci Tamamlandı.");
+
+        Notification notification = new Notification("Kitap İade Edildi: " + book.getTitle() + ", Toplam Ücret: " + totalCharge + " TL", LocalDate.now());
+        System.out.println("Bildirim: " + notification.getMessage() + " | Tarih: " + notification.getNotificationDate());
+
     }
 }
